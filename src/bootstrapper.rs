@@ -19,8 +19,6 @@ use std::{
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    buffer::Buffer,
-    layout::Rect,
     Terminal, TerminalOptions,
 };
 
@@ -72,15 +70,15 @@ pub fn universal_bootstrap<F: FnOnce(Scope) + 'static>(boot: F) -> Result<(), Bo
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let terminal = Terminal::new(backend)?;
-    let ps = PrefixSum2d::new(terminal.size()?);
-    let mut terminal = Arc::new(Mutex::new((terminal, ps)));
 
-    terminal.try_lock().unwrap().0.hide_cursor().unwrap();
-    terminal.try_lock().unwrap().0.clear().unwrap();
-    // .draw(|f| f.render_widget(Clear, f.size()))?;
-    // create app and run it
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    let ps = PrefixSum2d::new(terminal.size()?);
+
+    terminal.hide_cursor().unwrap();
+    terminal.clear().unwrap();
+
+    let mut terminal = Arc::new(Mutex::new((terminal, ps)));
     let res = bootstrap(terminal.clone(), boot);
 
     let mut terminal = Arc::try_unwrap(terminal)
@@ -97,9 +95,5 @@ pub fn universal_bootstrap<F: FnOnce(Scope) + 'static>(boot: F) -> Result<(), Bo
     )?;
     terminal.show_cursor()?;
 
-    if let Err(err) = res {
-        println!("{:?}", err)
-    }
-
-    Ok(())
+    res
 }

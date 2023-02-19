@@ -3,7 +3,10 @@ mod bootstrapper;
 mod controlflow;
 mod run;
 
-use bootstrapper::{universal_bootstrap, EventQueue, Quit, Region, RenderBase, RenderBaseCT};
+use bootstrapper::{
+    shared_ctx::{EventQueue, Quit, Region, RenderBase, RenderBaseCT},
+    universal_bootstrap,
+};
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use leptos_reactive::{create_effect, create_rw_signal, use_context};
 use std::{error::Error, io};
