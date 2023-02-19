@@ -36,48 +36,30 @@ pub fn bootstrap<T: FnOnce(Scope) + 'static, B: Backend + 'static>(
     let inner_out = Arc::clone(&out);
 
     let dispose = create_scope(create_runtime(), move |cx| {
-        let out = inner_out;
+        let o: Result<_, Box<dyn Error>> = try {
+            let quit = Quit::attach(cx);
+            let eq = EventQueue::attach(cx);
+            let region = Region::attach(cx, terminal.try_lock().unwrap().0.size()?);
+            RenderBase::attach(cx, terminal);
 
-        let quit = Quit::attach(cx);
-        let eq = EventQueue::attach(cx);
-        let region = Region::attach(
-            cx,
-            match terminal.try_lock().unwrap().0.size() {
-                Ok(t) => t,
-                Err(e) => {
-                    out.set(Err(e.into())).unwrap();
-                    return;
-                }
-            },
-        );
-        RenderBase::attach(cx, terminal);
+            boot(cx);
 
-        boot(cx);
+            while !quit.should_quit() {
+                use_context::<RenderBase<B>>(cx).unwrap().do_frame()?;
 
-        while !quit.should_quit() {
-            match use_context::<RenderBase<B>>(cx).unwrap().do_frame() {
-                Ok(_) => (),
-                Err(e) => {
-                    out.set(Err(e.into())).unwrap();
-                    return;
-                }
-            }
-
-            if poll(Duration::from_millis(10)).unwrap() {
-                match event::read() {
-                    Ok(Event::Resize(h, w)) => {
-                        todo!()
-                    }
-                    Ok(e) => {
-                        eq.set(e);
-                    }
-                    Err(e) => {
-                        out.set(Err(e.into())).unwrap();
-                        return;
+                if poll(Duration::from_millis(10))? {
+                    match event::read()? {
+                        Event::Resize(h, w) => {
+                            todo!()
+                        }
+                        e => {
+                            eq.set(e);
+                        }
                     }
                 }
             }
-        }
+        };
+        inner_out.set(o).unwrap();
     });
 
     dispose.dispose();
