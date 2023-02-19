@@ -1,12 +1,11 @@
-mod quit;
-mod terminal;
-pub use quit::*;
-
 mod eq;
-pub use eq::*;
-
-mod region;
-pub use region::*;
-
+mod quit;
 mod rb;
+mod region;
+mod terminal;
+
+pub use eq::*;
+pub use quit::*;
 pub use rb::*;
+pub use region::*;
+pub use terminal::*;

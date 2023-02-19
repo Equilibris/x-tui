@@ -1,99 +1,66 @@
+pub mod init;
 mod prefix_sum_2d;
 pub mod shared_ctx;
+mod test;
+pub use test::*;
+mod app;
+pub use app::*;
 
-use crossterm::{
-    event::{self, poll, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use leptos_reactive::{
-    create_runtime, create_rw_signal, create_scope, provide_context, use_context, ReadSignal,
-    RwSignal, Scope,
-};
-use std::{
-    cell::OnceCell,
-    error::Error,
-    io::{self, Stdout},
-    sync::{atomic::AtomicBool, Arc, Mutex, Weak},
-    time::Duration,
-};
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    Terminal, TerminalOptions,
-};
+use leptos_reactive::{create_runtime, create_scope, Scope};
+use std::{cell::OnceCell, error::Error, sync::Arc};
+use tui::backend::Backend;
 
-use self::prefix_sum_2d::PrefixSum2d;
+use init::{Init, Term};
 
-use self::shared_ctx::*;
-
-pub fn bootstrap<T: FnOnce(Scope) + 'static, B: Backend + 'static>(
-    terminal: Arc<Mutex<(Terminal<B>, PrefixSum2d)>>,
+pub fn bootstrap<T: FnOnce(Scope) + 'static, B: Backend + 'static, I: Init<B> + 'static>(
+    terminal: Term<B>,
     boot: T,
-) -> Result<(), Box<dyn Error>> {
+    init: I,
+) -> Result<I, Box<dyn Error>> {
     let out = Arc::new(OnceCell::new());
     let inner_out = Arc::clone(&out);
 
     let dispose = create_scope(create_runtime(), move |cx| {
-        let o: Result<_, Box<dyn Error>> = try {
-            let quit = Quit::attach(cx);
-            let eq = EventQueue::attach(cx);
-            let region = Region::attach(cx, terminal.try_lock().unwrap().0.size()?);
-            RenderBase::attach(cx, terminal);
-
-            boot(cx);
-
-            while !quit.should_quit() {
-                use_context::<RenderBase<B>>(cx).unwrap().do_frame()?;
-
-                if poll(Duration::from_millis(10))? {
-                    match event::read()? {
-                        Event::Resize(h, w) => {
-                            todo!()
-                        }
-                        e => {
-                            eq.set(e);
-                        }
-                    }
-                }
-            }
-        };
-        inner_out.set(o).unwrap();
+        inner_out
+            .set(init.init(cx, terminal, boot))
+            .unwrap_or_else(|_| unreachable!());
     });
 
     dispose.dispose();
 
-    Arc::try_unwrap(out).unwrap().into_inner().unwrap_or(Ok(()))
+    Arc::try_unwrap(out)
+        .unwrap_or_else(|_| unreachable!())
+        .into_inner()
+        .unwrap()
 }
 
-pub fn universal_bootstrap<F: FnOnce(Scope) + 'static>(boot: F) -> Result<(), Box<dyn Error>> {
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+#[cfg(test)]
+mod tests {
+    use leptos_reactive::{create_effect, use_context};
 
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let ps = PrefixSum2d::new(terminal.size()?);
+    use super::{
+        assert_rb,
+        shared_ctx::{Quit, RenderBaseAuto},
+        test_bootstrap,
+    };
 
-    terminal.hide_cursor().unwrap();
-    terminal.clear().unwrap();
+    #[test]
+    fn basic_init_then_quit() {
+        test_bootstrap(
+            |cx| {
+                let quit = use_context::<Quit>(cx).unwrap();
 
-    let mut terminal = Arc::new(Mutex::new((terminal, ps)));
-    let res = bootstrap(terminal.clone(), boot);
+                let rb: RenderBaseAuto = use_context(cx).unwrap();
 
-    let mut terminal = Arc::try_unwrap(terminal)
-        .unwrap_or_else(|_| panic!("Terminal leaked in main-loop"))
-        .into_inner()?
-        .0;
+                create_effect(cx, move |_| {
+                    assert_rb(&rb, "base");
 
-    // restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    res
+                    quit.quit();
+                })
+            },
+            10,
+            10,
+        )
+        .unwrap();
+    }
 }

@@ -6,9 +6,15 @@ use tui::{backend::Backend, layout::Rect, Terminal};
 use crate::bootstrapper::prefix_sum_2d::PrefixSum2d;
 
 // Flushing could be scoped but this is an optimization that has to be evaluated
-pub struct RenderBase<B: Backend + 'static>(pub(super) Weak<Mutex<(Terminal<B>, PrefixSum2d)>>);
+pub struct RenderBase<B: Backend + 'static>(
+    pub(in super::super) Weak<Mutex<(Terminal<B>, PrefixSum2d)>>,
+);
 
-pub type RenderBaseCT = RenderBase<tui::backend::CrosstermBackend<std::io::Stdout>>;
+#[cfg(not(test))]
+#[allow(dead_code)]
+pub type RenderBaseAuto = RenderBase<tui::backend::CrosstermBackend<std::io::Stdout>>;
+#[cfg(test)]
+pub type RenderBaseAuto = RenderBase<tui::backend::TestBackend>;
 
 impl<B: Backend + 'static> RenderBase<B> {
     pub fn attach(cx: Scope, v: Arc<Mutex<(Terminal<B>, PrefixSum2d)>>) {
@@ -29,9 +35,8 @@ impl<B: Backend + 'static> RenderBase<B> {
 
     pub fn do_frame(&self) -> Result<(), std::io::Error> {
         let term = self.access();
-        let mut term = &mut term.try_lock().unwrap();
+        let term = &mut term.try_lock().unwrap();
 
-        let sz = term.0.size()?;
         let data = term.0.current_buffer_mut().clone();
         let base_data = term.1.clone();
 

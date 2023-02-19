@@ -26,7 +26,7 @@ impl<'a> Iterator for PrefixSum2dIterator<'a> {
         if self.idx >= self.parent.ir.len() {
             return None;
         }
-        if let Some((min_x, min_y, max_x, max_y)) = self.parent.inner_bound {
+        if let Some((_min_x, _min_y, _max_x, _max_y)) = self.parent.inner_bound {
             let w = self.parent.sz.width;
 
             let x = self.idx as u16 % w;
@@ -268,7 +268,7 @@ mod tests {
         let mut base = PrefixSum2d::new(sz);
         base.insert(Rect::new(0, 0, 1, 1));
 
-        let mut iterator = base.iter().map(|(_, _, v)| v).collect::<Vec<_>>();
+        let iterator = base.iter().map(|(_, _, v)| v).collect::<Vec<_>>();
 
         assert_eq!(iterator, vec![1, 0, 0, 0, 0, 0, 0, 0, 0])
     }

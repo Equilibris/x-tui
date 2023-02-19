@@ -1,34 +1,15 @@
-use std::borrow::BorrowMut;
-use std::hash::Hash;
-use std::{cell::RefCell, collections::HashMap};
-
-use leptos_reactive::{
-    create_effect, create_memo, create_rw_signal, MaybeSignal, Memo, ReadSignal, RwSignal, Scope,
-    ScopeDisposer,
-};
-use tui::layout::Rect;
+use leptos_reactive::{create_effect, Scope, ScopeDisposer};
 
 pub fn show(
     cx: Scope,
-    when: MaybeSignal<bool>,
-    valid: impl FnMut(Scope) + Clone + 'static,
-) -> MaybeSignal<Option<ScopeDisposer>> {
-    MaybeSignal::derive(cx, move || {
-        if when() {
-            Some(cx.child_scope(valid.clone()))
-        } else {
-            None
+    when: impl Fn() -> bool + 'static,
+    valid: impl Fn(Scope) + Clone + 'static,
+    fallback: impl Fn(Scope) + Clone + 'static,
+) {
+    create_effect(cx.clone(), move |last: Option<ScopeDisposer>| {
+        if let Some(last) = last {
+            last.dispose();
         }
-    })
-}
-
-pub fn show_with_fallback(
-    cx: Scope,
-    when: MaybeSignal<bool>,
-    valid: impl FnMut(Scope) + Clone + 'static,
-    fallback: impl FnMut(Scope) + Clone + 'static,
-) -> MaybeSignal<ScopeDisposer> {
-    MaybeSignal::derive(cx.clone(), move || {
         if when() {
             cx.child_scope(valid.clone())
         } else {
