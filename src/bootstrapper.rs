@@ -54,12 +54,11 @@ mod tests {
 
                 create_effect(cx, move |_| {
                     assert_rb(&rb, "base");
-
-                    quit.quit();
                 })
             },
             10,
             10,
+            true,
         )
         .unwrap();
     }

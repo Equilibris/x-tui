@@ -113,6 +113,9 @@ impl PrefixSum2d {
         let i = bound.y * self.sz.width + bound.x;
         let i = i as usize;
 
+        if i >= self.ir.len() {
+            return;
+        }
         if self.ir[i] == 0 {
             self.fast_clear_locs.push(i)
         }

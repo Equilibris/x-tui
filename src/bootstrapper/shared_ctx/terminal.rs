@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crossterm::event::KeyCode;
 use leptos_reactive::{
     create_effect, create_memo, create_rw_signal, provide_context, use_context, RwSignal, Scope,
@@ -5,7 +7,7 @@ use leptos_reactive::{
 };
 use tui::{
     layout::Rect,
-    widgets::{Block, Borders},
+    widgets::{Block, Borders, Clear},
 };
 
 use crate::controlflow::show;
@@ -13,7 +15,7 @@ use crate::controlflow::show;
 use super::{EventQueue, Region, RenderBaseAuto};
 
 #[derive(Clone, Copy)]
-pub struct Terminal(RwSignal<Vec<String>>);
+pub struct Terminal(RwSignal<Vec<(Instant, String)>>);
 
 impl Terminal {
     pub fn attach(cx: Scope) -> Self {
@@ -46,9 +48,9 @@ impl Terminal {
         });
         let my_area = Signal::derive(cx, move || {
             let r = region();
-            let c = region();
+            let c = child_area();
 
-            Rect::new(0, c.height + 1, r.width, r.height - c.height)
+            Rect::new(0, c.height, r.width, r.height - c.height)
         });
 
         cx.child_scope(|cx| {
@@ -61,17 +63,17 @@ impl Terminal {
             cx,
             when,
             move |cx| {
-                // let quit: Quit = use_context(cx).unwrap();
-
                 let rb: RenderBaseAuto = use_context(cx).unwrap();
 
+                let block = Block::default()
+                    .borders(Borders::ALL)
+                    .style(tui::style::Style::default().bg(tui::style::Color::Red));
+
                 create_effect(cx, move |_| {
+                    let block = block.clone();
                     let reg = my_area();
 
-                    let block = Block::default()
-                        .borders(Borders::ALL)
-                        .style(tui::style::Style::default().bg(tui::style::Color::Red));
-
+                    rb.render(Clear, reg);
                     rb.render(block, reg);
                 });
             },
@@ -79,8 +81,8 @@ impl Terminal {
         );
     }
 
-    pub fn enqueue(&self, msg: String) {
-        self.0.update(move |v| v.push(msg))
+    pub fn log(&self, msg: String) {
+        self.0.update(move |v| v.push((Instant::now(), msg)))
     }
     pub fn clear(&self) {
         self.0.update(move |v| v.clear())

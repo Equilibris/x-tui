@@ -51,13 +51,13 @@ impl<B: Backend + 'static> Init<B> for AppInit {
     }
 }
 
-pub struct TestInit(mpsc::Sender<Event>, mpsc::Receiver<Event>);
+pub struct TestInit(bool, mpsc::Sender<Event>, mpsc::Receiver<Event>);
 
 impl TestInit {
-    pub fn new() -> Self {
+    pub fn new(once: bool) -> Self {
         let (tc, tx) = channel();
 
-        Self(tc, tx)
+        Self(once, tc, tx)
     }
 }
 
@@ -71,8 +71,12 @@ impl<B: Backend + 'static> Init<B> for TestInit {
         let quit = Quit::attach(cx);
         let eq = EventQueue::attach(cx);
         let region = Region::attach(cx, terminal.try_lock().unwrap().0.size()?);
-        EventDispatcher::attach(cx, self.0.clone());
+        EventDispatcher::attach(cx, self.1.clone());
         RenderBase::attach(cx, Arc::clone(&terminal));
+
+        if self.0 {
+            quit.quit()
+        }
 
         boot(cx);
 
@@ -80,7 +84,7 @@ impl<B: Backend + 'static> Init<B> for TestInit {
             let rb = use_context::<RenderBase<B>>(cx).unwrap();
             rb.do_frame()?;
 
-            EventQueue::test_poll(&eq, &self.1, &region, rb)?;
+            EventQueue::test_poll(&eq, &self.2, &region, rb)?;
         }
 
         Ok(self)

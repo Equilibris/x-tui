@@ -11,6 +11,7 @@ pub fn test_bootstrap(
     boot: impl FnOnce(Scope) + 'static,
     w: u16,
     h: u16,
+    once: bool,
 ) -> Result<(), Box<dyn Error>> {
     let backend = TestBackend::new(w, h);
     let terminal = Terminal::new(backend)?;
@@ -18,7 +19,7 @@ pub fn test_bootstrap(
 
     let terminal = Arc::new(Mutex::new((terminal, ps)));
 
-    let init = TestInit::new();
+    let init = TestInit::new(once);
 
     bootstrap(terminal, boot, init)?;
     Ok(())
