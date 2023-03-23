@@ -8,7 +8,8 @@ edition = "2021"
 [dependencies]
 tui = "0.19"
 crossterm = "0.26"
-leptos_reactive = "0.1"
+leptos_reactive = "0.2"
+chrono = "0.4"
 
 [dev-dependencies]
 insta = { version = "1.28.0", features = ["yaml"] }

@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 
-use leptos_reactive::{
-    create_effect, create_memo, create_rw_signal, ReadSignal, RwSignal, Scope, ScopeDisposer,
-};
+use leptos_reactive::*;
 
-pub fn show(
+pub fn show<Valid: Fn(Scope) + Clone + 'static, Fallback: Fn(Scope) + Clone + 'static>(
     cx: Scope,
     when: impl Fn() -> bool + 'static,
-    valid: impl Fn(Scope) + Clone + 'static,
-    fallback: impl Fn(Scope) + Clone + 'static,
+    valid: Valid,
+    fallback: Fallback,
 ) {
     let when = create_memo(cx, move |_| when());
 
@@ -16,6 +14,7 @@ pub fn show(
         if let Some(last) = last {
             last.dispose();
         }
+
         if when() {
             cx.child_scope(valid.clone())
         } else {
@@ -84,13 +83,12 @@ impl<K: std::hash::Hash + Eq, Com: Clone + 'static> EachContainer<K, Com> {
     }
 }
 
-impl<K: std::hash::Hash + Eq, Com: Clone + 'static> Default for EachContainer<K, Com> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub fn each<K: std::hash::Hash + Eq + 'static, Com: Clone + 'static, T, It: Iterator<Item = T>>(
+pub fn each<
+    K: std::hash::Hash + Eq + 'static,
+    Com: Clone + 'static,
+    T: std::fmt::Debug,
+    It: Iterator<Item = T> + Clone,
+>(
     cx: Scope,
     it: impl Fn() -> It + 'static,
     key: impl Fn(&T, usize) -> K + 'static + Clone,
@@ -99,9 +97,11 @@ pub fn each<K: std::hash::Hash + Eq + 'static, Com: Clone + 'static, T, It: Iter
     render: impl Fn(Scope, ReadSignal<Com>) + 'static + Clone,
 ) {
     create_effect(cx, move |last: Option<EachContainer<K, Com>>| {
-        let v = last.unwrap_or_else(Default::default);
+        let it = it();
 
-        v.update(cx, it(), key.clone(), sizer.clone(), render.clone())
+        let v = last.unwrap_or_else(EachContainer::new);
+
+        v.update(cx, it, key.clone(), sizer.clone(), render.clone())
     })
 }
 
@@ -111,21 +111,27 @@ mod tests {
     use tui::{layout::Rect, text::Span, widgets::Paragraph};
 
     use super::*;
-    use crate::bootstrapper::{assert_rb, shared_ctx::RenderBaseAuto, test_bootstrap};
+    use crate::bootstrapper::{
+        assert_rb,
+        shared_ctx::{Quit, RenderBaseAuto, RenderCounter},
+        test_bootstrap,
+    };
 
     #[test]
     fn each_basics() {
         test_bootstrap(
             |cx| {
-                let v = create_rw_signal(cx, [0, 1, 2]);
+                let v = create_rw_signal(cx, vec![0, 1, 2, 3, 4]);
+                let cycle: RenderCounter = use_context(cx).unwrap();
 
                 let rb: RenderBaseAuto = use_context(cx).unwrap();
+                let quit: Quit = use_context(cx).unwrap();
 
                 each(
                     cx,
-                    move || v().into_iter(),
+                    move || v.with(|v| v.clone().into_iter()),
                     |_, i| i,
-                    |_, v, idx| Some((v, Rect::new(idx.try_into().unwrap(), 0, 9, 1))),
+                    |_, v, idx| Some((v, Rect::new(0, idx.try_into().unwrap(), 9, 1))),
                     |cx, v| {
                         let rb: RenderBaseAuto = use_context(cx).unwrap();
                         create_effect(cx, move |_| {
@@ -137,13 +143,25 @@ mod tests {
                     },
                 );
 
-                create_effect(cx, move |_| {
-                    assert_rb(&rb, "each-basics");
+                create_effect(cx, move |_| match cycle.0() {
+                    0 => {
+                        assert_rb(&rb, "each-basics-0");
+                        v.update(|v| v.push(5));
+                    }
+                    1 => {
+                        assert_rb(&rb, "each-basics-1");
+                        v.update(|v| v.push(6));
+                    }
+                    2 => {
+                        assert_rb(&rb, "each-basics-2");
+                        v.update(|v| v.push(7));
+                    }
+                    _ => (),
                 })
             },
             10,
             10,
-            true,
+            Some(3),
         )
         .unwrap();
     }

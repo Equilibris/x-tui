@@ -58,7 +58,7 @@ mod tests {
             },
             10,
             10,
-            true,
+            Some(0),
         )
         .unwrap();
     }

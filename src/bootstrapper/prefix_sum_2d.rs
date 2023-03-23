@@ -86,7 +86,7 @@ impl PrefixSum2d {
         }
     }
 
-    pub fn insert(&mut self, bound: Rect) {
+    pub fn insert_mul(&mut self, bound: Rect, mul: isize) {
         match self.inner_bound {
             Some(mut v) => {
                 v.0 = std::cmp::min(v.0, bound.x);
@@ -120,7 +120,7 @@ impl PrefixSum2d {
             self.fast_clear_locs.push(i)
         }
 
-        self.ir[i] += 1;
+        self.ir[i] += mul;
 
         let mut ca = false;
         if bound.y + bound.height < self.sz.height {
@@ -128,11 +128,13 @@ impl PrefixSum2d {
             let i = (bound.y + bound.height) * self.sz.width + bound.x;
             let i = i as usize;
 
-            if self.ir[i] == 0 {
-                self.fast_clear_locs.push(i)
-            }
+            if i < self.ir.len() {
+                if self.ir[i] == 0 {
+                    self.fast_clear_locs.push(i)
+                }
 
-            self.ir[i] -= 1;
+                self.ir[i] -= mul;
+            }
         }
 
         if bound.x + bound.width < self.sz.width {
@@ -144,7 +146,7 @@ impl PrefixSum2d {
                 self.fast_clear_locs.push(i)
             }
 
-            self.ir[i] -= 1;
+            self.ir[i] -= mul;
         }
         if ca {
             let i = (bound.y + bound.height) * self.sz.width + bound.x + bound.width;
@@ -154,8 +156,12 @@ impl PrefixSum2d {
                 self.fast_clear_locs.push(i)
             }
 
-            self.ir[i] += 1;
+            self.ir[i] += mul;
         }
+    }
+
+    pub fn insert(&mut self, bound: Rect) {
+        self.insert_mul(bound, 1)
     }
 
     pub fn iter(&self) -> PrefixSum2dIterator<'_> {

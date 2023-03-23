@@ -5,7 +5,7 @@ use std::{
 };
 
 use crossterm::event::{self, Event};
-use leptos_reactive::{create_rw_signal, provide_context, ReadSignal, RwSignal, Scope};
+use leptos_reactive::*;
 use tui::{backend::Backend, layout::Rect};
 
 use super::RenderBase;
@@ -51,10 +51,13 @@ impl EventQueue {
         Ok(match e {
             Event::Resize(h, w) => {
                 let rect = tui::layout::Rect::new(0, 0, w, h);
-                let rb = rb.access();
-                let mut rb = rb.try_lock().unwrap();
-                rb.1.resize(rect);
-                rb.0.resize(rect)?;
+                {
+                    let rb = rb.access();
+                    let mut rb = rb.lock().unwrap();
+                    rb.1.resize(rect);
+                    rb.0.resize(rect)?;
+                }
+
                 region.set(rect);
                 eq.set(Event::Resize(h, w));
             }

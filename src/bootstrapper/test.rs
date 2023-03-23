@@ -11,7 +11,7 @@ pub fn test_bootstrap(
     boot: impl FnOnce(Scope) + 'static,
     w: u16,
     h: u16,
-    once: bool,
+    once: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
     let backend = TestBackend::new(w, h);
     let terminal = Terminal::new(backend)?;
@@ -49,6 +49,8 @@ pub fn assert_rb(rb: &RenderBase<TestBackend>, snap_name: &'_ str) {
         .intersperse("$\n".into())
         .chain(std::iter::once("$".into()))
         .collect::<String>();
+
+    println!("insta@{}\n{}", snap_name, out.as_str());
 
     insta::assert_snapshot!(snap_name, out.as_str());
 }

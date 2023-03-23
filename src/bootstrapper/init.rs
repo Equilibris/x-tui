@@ -1,5 +1,5 @@
 use crossterm::event::Event;
-use leptos_reactive::{use_context, Scope};
+use leptos_reactive::*;
 use std::{
     error::Error,
     sync::{
@@ -9,7 +9,10 @@ use std::{
 };
 use tui::{backend::Backend, Terminal};
 
-use super::{prefix_sum_2d::PrefixSum2d, shared_ctx};
+use super::{
+    prefix_sum_2d::PrefixSum2d,
+    shared_ctx::{self, Console},
+};
 
 use super::shared_ctx::*;
 
@@ -24,7 +27,8 @@ pub trait Init<B: Backend>: Sized {
     ) -> Result<Self, Box<dyn Error>>;
 }
 
-pub struct AppInit;
+#[derive(Default)]
+pub struct AppInit(pub(super) Option<String>);
 
 impl<B: Backend + 'static> Init<B> for AppInit {
     fn init(
@@ -36,28 +40,35 @@ impl<B: Backend + 'static> Init<B> for AppInit {
         let quit = Quit::attach(cx);
         let eq = EventQueue::attach(cx);
         let region = Region::attach(cx, terminal.try_lock().unwrap().0.size()?);
+        let rc = RenderCounter::attach(cx);
+
         RenderBase::attach(cx, terminal);
 
-        shared_ctx::Terminal::attach(cx).render_encapsulate(cx, |cx| boot(cx));
+        Console::attach(cx).render_encapsulate(cx, |cx| boot(cx));
+
+        let mut count = 0;
 
         while !quit.should_quit() {
             let rb = use_context::<RenderBase<B>>(cx).unwrap();
             rb.do_frame()?;
 
             EventQueue::poll(&eq, &region, rb)?;
+            count += 1;
+
+            rc.set(count);
         }
 
-        Ok(Self)
+        Ok(Self(Some(quit.get_msg())))
     }
 }
 
-pub struct TestInit(bool, mpsc::Sender<Event>, mpsc::Receiver<Event>);
+pub struct TestInit(Option<usize>, mpsc::Sender<Event>, mpsc::Receiver<Event>);
 
 impl TestInit {
-    pub fn new(once: bool) -> Self {
+    pub fn new(count: Option<usize>) -> Self {
         let (tc, tx) = channel();
 
-        Self(once, tc, tx)
+        Self(count, tc, tx)
     }
 }
 
@@ -71,20 +82,28 @@ impl<B: Backend + 'static> Init<B> for TestInit {
         let quit = Quit::attach(cx);
         let eq = EventQueue::attach(cx);
         let region = Region::attach(cx, terminal.try_lock().unwrap().0.size()?);
+        let rc = RenderCounter::attach(cx);
+
         EventDispatcher::attach(cx, self.1.clone());
         RenderBase::attach(cx, Arc::clone(&terminal));
 
-        if self.0 {
-            quit.quit()
-        }
+        let mut count = 0;
 
         boot(cx);
 
-        while !quit.should_quit() {
+        while !quit.should_quit()
+            && match self.0 {
+                Some(v) => count < v,
+                _ => true,
+            }
+        {
             let rb = use_context::<RenderBase<B>>(cx).unwrap();
             rb.do_frame()?;
 
             EventQueue::test_poll(&eq, &self.2, &region, rb)?;
+            count += 1;
+
+            rc.set(count);
         }
 
         Ok(self)

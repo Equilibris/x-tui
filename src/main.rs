@@ -1,55 +1,59 @@
 #![feature(once_cell, try_blocks, iter_intersperse)]
 mod bootstrapper;
 mod controlflow;
+mod split_word_wrap;
+mod tdom;
 
-use bootstrapper::{
-    app_bootstrap,
-    shared_ctx::{EventQueue, Quit, Region, RenderBaseAuto},
-};
+use bootstrapper::{app_bootstrap, shared_ctx::*};
 use crossterm::event::{Event, KeyCode};
-use leptos_reactive::{create_effect, create_rw_signal, use_context};
+use leptos_reactive::{create_effect, create_rw_signal, prelude::*, use_context};
 use std::error::Error;
+use tdom::*;
 use tui::{
     text::Span,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{BorderType, Borders, Clear, Paragraph},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
     app_bootstrap(|cx| {
-        let quit = use_context::<Quit>(cx).unwrap();
-        let event = use_context::<EventQueue>(cx).unwrap();
-        let sz = use_context::<Region>(cx).unwrap();
-        let term = use_context::<RenderBaseAuto>(cx).unwrap();
+        let quit: Quit = use_context(cx).unwrap();
+        let event: EventQueue = use_context(cx).unwrap();
+        let sz: Region = use_context(cx).unwrap();
+        let term: RenderBaseAuto = use_context(cx).unwrap();
+        let cons: Console = use_context(cx).unwrap();
         let term0 = term.clone();
         let str = create_rw_signal(cx, "    ".to_string());
 
-        create_effect(cx, move |_| {
-            str.with(|v| {
-                let block = Block::default()
-                    .borders(Borders::ALL)
-                    .title(Span::raw(
-                        v.as_str(),
-                        // Style::default().bg(tui::style::Color::Black),
-                    ))
-                    .title_alignment(tui::layout::Alignment::Center)
-                    .border_type(BorderType::Rounded);
-                let p =
-                    Paragraph::new(Span::from(v.as_str())).wrap(tui::widgets::Wrap { trim: true });
+        tdom::Block::default()
+            .borders(Borders::ALL)
+            .title(MaybeSignal::derive(cx, move || {
+                str()
+                // str.with(|v| Span::raw(v.as_str()))
+            }))
+            .title_alignment(tui::layout::Alignment::Center)
+            .border_type(BorderType::Rounded)
+            .render();
+        // create_effect(cx, move |_| {
+        //     str.with(|v| {
+        //         let block = tui::widgets::Block::default().borders(Borders::ALL);
+        //         let p =
+        //             Paragraph::new(Span::from(v.as_str())).wrap(tui::widgets::Wrap { trim: true });
 
-                term.render(Clear, sz());
-                term.render(p, block.inner(sz()));
-                term.render(block, sz());
-            })
-        });
+        //         term.render(Clear, sz());
+        //         term.render(p, block.inner(sz()));
+        //         term.render(block, sz());
+        //     })
+        // });
 
         create_effect(cx, move |_| match event() {
             Event::Key(e) => match e.code {
                 KeyCode::Char(c) => str.update(|v| v.push(c)),
-                KeyCode::Enter => quit.quit(),
+                KeyCode::Enter => quit.quit_with_message("Hello World"),
                 KeyCode::Up => term0.render(Clear, sz()),
                 KeyCode::Backspace => str.update(|v| {
                     v.pop();
                 }),
+                KeyCode::Down => cons.log("Down pressed\n\n\nhi\nhi"),
                 _ => (),
             },
             _ => {}
