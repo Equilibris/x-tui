@@ -1,3 +1,4 @@
+use crate::bootstrapper::shared_ctx::RenderBase;
 use leptos_reactive::*;
 use tui::{
     backend::Backend,
@@ -7,10 +8,9 @@ use tui::{
     text::Spans,
     widgets::{self, BorderType, Borders, Clear},
 };
-use x_tui::bootstrapper::shared_ctx::RenderBase;
 
 pub trait Render<B: Backend> {
-    fn render(self, cx: &Scope, area: Rect, base: &RenderBase<B>);
+    fn render(self, cx: Scope, area: Rect, base: &RenderBase<B>);
 }
 pub trait SelfSized<B: Backend>: Render<B> {
     fn size(&self, max: Rect);
@@ -20,7 +20,7 @@ pub trait SelfSized<B: Backend>: Render<B> {
 pub struct Clearing;
 
 impl<B: Backend> Render<B> for Clearing {
-    fn render(self, cx: &Scope, area: Rect, base: &RenderBase<B>) {
+    fn render(self, cx: Scope, area: Rect, base: &RenderBase<B>) {
         base.render(Clear, area)
     }
 }
@@ -55,8 +55,8 @@ impl Default for Block<Clearing, ()> {
 impl<B: Backend, Child: Render<B>, Title: Clone + for<'a> Into<Spans<'a>>> Render<B>
     for Block<Child, Title>
 {
-    fn render(self, cx: &Scope, area: Rect, base: &RenderBase<B>) {
-        let block = MaybeSignal::derive(*cx, move || {
+    fn render(self, cx: Scope, area: Rect, base: &RenderBase<B>) {
+        let block = MaybeSignal::derive(cx, move || {
             widgets::Block::default()
                 .title_alignment(self.title_alignment.get())
                 .borders(self.borders.get())
@@ -66,9 +66,9 @@ impl<B: Backend, Child: Render<B>, Title: Clone + for<'a> Into<Spans<'a>>> Rende
                 .title(self.title.get())
         });
 
-        let inner = MaybeSignal::derive(*cx, move || block.with(|v| v.inner(area)));
+        let inner = MaybeSignal::derive(cx, move || block.with(|v| v.inner(area)));
 
-        create_effect(*cx, |_| {});
+        create_effect(cx, move |_| base.render(block(), area));
     }
 }
 

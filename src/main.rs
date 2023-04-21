@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }))
             .title_alignment(tui::layout::Alignment::Center)
             .border_type(BorderType::Rounded)
-            .render();
+            .render(cx, sz.get_untracked(), &term);
         // create_effect(cx, move |_| {
         //     str.with(|v| {
         //         let block = tui::widgets::Block::default().borders(Borders::ALL);
